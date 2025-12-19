@@ -32,10 +32,32 @@ function logSO3(R::AbstractMatrix{<:Real})
     c = (tr(R) - 1) / 2
     c = clamp(c, -1.0, 1.0)
     θ = acos(c)
+
     if θ < 1e-10
         return 0.5 * vee(R - R')
     end
-    Φ = (θ/(2*sin(θ))) * (R - R')
+
+    if abs(pi - θ) < 1e-6
+        M = R - Matrix{Float64}(I, 3, 3)
+        U, S, Vt = svd(M)
+        axis = Vt'[:, end]
+        na = norm(axis)
+        if na < 1e-12
+            s = vee(R - R')
+            ns = norm(s)
+            axis = (ns > 1e-12) ? (s / ns) : [1.0, 0.0, 0.0]
+        else
+            axis ./= na
+        end
+
+        s = vee(R - R')
+        if dot(axis, s) < 0
+            axis .*= -1
+        end
+        return θ * axis
+    end
+
+    Φ = (θ / (2*sin(θ))) * (R - R')
     return vee(Φ)
 end
 
@@ -67,7 +89,6 @@ function project_to_SO3(M::AbstractMatrix{<:Real})
     return R
 end
 
-# Wahba cost for convention: y_k ≈ Q' x_k
 function wahba_residual(Q::AbstractMatrix{<:Real},
                         X::AbstractMatrix{<:Real},
                         Y::AbstractMatrix{<:Real})
